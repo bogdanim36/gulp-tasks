@@ -7,5 +7,5 @@ All you need is to adapt the config file (gulpfile.config.json) as you need.
 
 Each folder declared in configs array form gulpfile.config.json must contain a gulp-config.json with js and css files to include in index.html.
 
-Dev-Watch-Es6 and Dev-Watch-Es5 has watcher for add/remove css, js files, and wqill generate automate hte index.html. However, it's possibile to get some error from gulp-watch while adding/remove files. In this situation you must close, wtahcer task, update manually golp-config.json files, an restart watcher task.
+Dev-Watch-Es6 and Dev-Watch-Es5 has watchers for add/remove css, js files, and will generate the index.html instantly. However, it's possibile to get some error from gulp-watch while adding/remove files. In this situation you must close, wtahcer task, update manually golp-config.json files, an restart watcher task.
 
