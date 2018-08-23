@@ -1,0 +1,73 @@
+{
+  "path": {
+    "src": "src/",
+    "bowerLibs": [
+      "components/bower-libs",
+      "app-modules/bower-libs"
+    ],
+    "public": "wwwroot",
+    "publishPrepare": "src-compiled"
+  },
+  "productionBase": "/",
+  "tasks": [
+    {
+      "extension": ".css",
+      "outputFileName": "site.min.css"
+    },
+    {
+      "extension": ".js",
+      "outputFileName": "head.min.js"
+    },
+    {
+      "extension": ".js",
+      "outputFileName": "body.min.js"
+    }
+  ],
+  "babelPresets": [
+    "es2015"
+  ],
+  "deployFtp": {
+    "remotePlatformValues": [
+      "unix",
+      "windows"
+    ],
+    "devWatch1": "devWatchEs6",
+    "profiles": {
+      "devWatchEs6": {
+        "type": "sftp",
+        "host": "bogdanim36.asuscomm.com",
+        "port": "5022",
+        "remotePlatform": "unix",
+        "user": "bmiftp",
+        "pass": "|#}3VY",
+        "remotePath": "/web/AxFrmk/v.1.0.3"
+      },
+      "publish": {
+        "type": "sftp",
+        "host": "bogdanim36.asuscomm.com",
+        "port": "5022",
+        "remotePlatform": "unix",
+        "user": "bmiftp",
+        "pass": "|#}3VY",
+        "remotePath": "/web/AxFrmk/public"
+      }
+    }
+  },
+  "productionCopy": [
+    "src/app-modules/docs/**/*.js",
+    "src/app-modules/demo-app/**/*.js"
+  ],
+  "favicon": "app-modules\\favicon.jpg",
+  "fontsFileMasks": [
+    "/components/bower-libs/font-awesome/fonts/*.*",
+    "/components/bower-libs/bootstrap/fonts/*.*"
+  ],
+  "configs": {
+    "components": {
+      "path": "components"
+    },
+    "app-modules": {
+      "path": "app-modules"
+    }
+  }
+}
