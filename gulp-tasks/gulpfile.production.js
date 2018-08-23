@@ -11,17 +11,19 @@ var gulp = require("gulp"),
 	merge = require("merge-stream"),
 	runSequence = require('run-sequence'),
 	rename = require('gulp-rename'),
+	fileExists = require('file-exists'),
 	del = require("del"),
 	babel = require("gulp-babel"),
-	watch = require('gulp-watch'),
 	jshint = require("gulp-jshint"),
 	stylish = require('jshint-stylish'),
 	htmlReplace = require('gulp-html-replace'),
 	debug = require('gulp-debug'),
 	Vinyl = require('vinyl'),
-	gulpConfig = require("../gulpfile.config.json"),
-	applicationInfo = require("../" + gulpConfig.path.src + "app-modules/modules-vars");
+	gulpConfig = require("../gulpfile.config.json");
 
+let appInfoPath = gulpConfig.path.applicationInfo? "../" + gulpConfig.path.src + gulpConfig.path.applicationInfo: "xxx";
+if (fileExists(appInfoPath )) var applicationInfo = require("../" + gulpConfig.path.src + "app-modules/modules-vars");
+else var applicationInfo = {};
 
 gulp.task("Publish-0-All", ['publish-copy'], function () {
 	setTimeout(function () {
