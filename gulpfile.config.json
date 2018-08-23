@@ -35,21 +35,21 @@
     "profiles": {
       "devWatchEs6": {
         "type": "sftp",
-        "host": "bogdanim36.asuscomm.com",
-        "port": "5022",
+        "host": "my-server",
+        "port": "22",
         "remotePlatform": "unix",
-        "user": "bmiftp",
-        "pass": "|#}3VY",
-        "remotePath": "/web/AxFrmk/v.1.0.3"
+        "user": "ftp-user",
+        "pass": "------",
+        "remotePath": "/web/"
       },
       "publish": {
         "type": "sftp",
-        "host": "bogdanim36.asuscomm.com",
-        "port": "5022",
+        "host": "my-server",
+        "port": "22",
         "remotePlatform": "unix",
-        "user": "bmiftp",
-        "pass": "|#}3VY",
-        "remotePath": "/web/AxFrmk/public"
+        "user": "ftp-user",
+        "pass": "----",
+        "remotePath": "/web/public"
       }
     }
   },
