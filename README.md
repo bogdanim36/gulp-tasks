@@ -11,3 +11,6 @@ Dev-Watch-Es6 and Dev-Watch-Es5 tasks has watchers for add/remove css, js files,
 If you experience some problems, and the files from public folder, is as it's must, you cand run Dev-Copy task, which will empty folder, and copy all the files coresponded from gulp-config.json files. Then you cand restart Dev-watch task.
 
 For deploy, is enough to run Publish All task, which will do operations: compile scss files and copy in prepare folder, transpile js files and copy to prepare folder, copy all other files to prepare folder, minify, uglify, concatenate js and css files and copy to final public folder, generate index.html file, generate one concatenate licence for all MIT plugin, copy rest files (html, images, fonts) to public folder.
+
+One problem, wich must solve manually, is the order to include files in index.hml head. By default, new files are added to end of the list
+, but also is posible your IDE editor to delete and recreate the file you are editing, situation which produce a remove and add (to end of the list) of this file.
