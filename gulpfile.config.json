@@ -7,6 +7,7 @@
     ],
     "public": "wwwroot",
     "publishPrepare": "src-compiled"
+    "applicationInfo": "application-info"
   },
   "productionBase": "/",
   "tasks": [
