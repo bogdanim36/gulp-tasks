@@ -3,7 +3,6 @@ var gulp = require("gulp"),
 	fs = require('fs'),
 	del = require("del"),
 	sass = require("gulp-sass"),
-	runSequence = require('run-sequence'),
 	rename = require('gulp-rename'),
 	plumber = require('gulp-plumber'),
 	sourceMaps = require('gulp-sourcemaps'),
@@ -16,7 +15,6 @@ var gulp = require("gulp"),
 	fileExists = require('file-exists'),
 	sftp = require('gulp-sftp'),
 	gulpConfig = require("../gulpfile.config.json"),
-	applicationInfo = require("../" + gulpConfig.path.src + "app-modules/modules-vars"),
 	tasks = gulpConfig.tasks;
 
 const pathFn = require('path');
@@ -26,19 +24,12 @@ for (let config in configFiles) {
 	configFiles[config].data = require("../" + gulpConfig.path.src + path)
 }
 
-gulp.task("Clean-wwwroot", function () {
-	return del([gulpConfig.path.public + '/**', '!' + gulpConfig.path.public]).then(paths => {
-		console.log('Deleted ' + gulpConfig.path.public + ' files and folders:');
-	});
-});
-
-
 var indexHtml = {
-	refresh: function (file, remove) {
+	refresh: function (file, remove, publicPath) {
 		var config = indexHtml.findConfigForFile(file);
 		var root = file.substring(0, file.indexOf("\\"));
 		if (config) {
-			if (remove) indexHtml.removeFileFromConfig(file, root, config);
+			if (remove) indexHtml.removeFileFromConfig(file, root, config, publicPath);
 			return;
 		} else {
 			if (remove) return;
@@ -46,19 +37,19 @@ var indexHtml = {
 			addBowerLibsFolders(bLibs, "", "");
 			if (bLibs.indexOf(root) > -1) return;
 			config = indexHtml.getConfigForRoot(root);
-			indexHtml.addFileToConfig(file, root, config);
+			indexHtml.addFileToConfig(file, root, config, publicPath);
 		}
 	},
-	updateConfigFiles: function (sourceFile, event) {
-		var fullPath = gulpConfig.path.public + "\\" + sourceFile;
+	updateConfigFiles: function (sourceFile, event, publicPath) {
+		var fullPath = publicPath + "\\" + sourceFile;
 		if (event === 'add') {
-			if (!isBowerLibs(sourceFile)) indexHtml.refresh(sourceFile, false);
+			if (!isBowerLibs(sourceFile)) indexHtml.refresh(sourceFile, false, publicPath);
 		} else if (event === 'unlink') {
-			indexHtml.refresh(sourceFile, true);
+			indexHtml.refresh(sourceFile, true, publicPath);
 			if (fileExists(fullPath)) fs.unlink(fullPath);
 		}
 	},
-	addFileToConfig: function (file, root, config) {
+	addFileToConfig: function (file, root, config, publicPath) {
 		var ext = file.substring(file.lastIndexOf("."));
 		file = replaceall("\\", "/", file).replace(".es6.", ".").replace(".dev.", ".").replace(".prod.", ".");
 		var task;
@@ -86,10 +77,12 @@ var indexHtml = {
 		var fileContent = JSON.stringify(config.data);
 		var fileName = gulpConfig.path.src + "/" + root + "/gulp-config.json";
 		fs.writeFile(fileName, fileContent, 'utf8', function () {
-			setTimeout(devIndex, 0);
+			setTimeout(function () {
+				devIndex(publicPath);
+			}, 0);
 		});
 	},
-	removeFileFromConfig: function (file, root, config) {
+	removeFileFromConfig: function (file, root, config, publicPath) {
 		var ext = file.substring(file.lastIndexOf("."));
 		file = replaceall("\\", "/", file).replace(".dev.", ".").replace(".prod.", ".");
 		var data;
@@ -112,7 +105,9 @@ var indexHtml = {
 		var fileContent = JSON.stringify(config.data);
 		var fileName = gulpConfig.path.src + "/" + root + "/gulp-config.json";
 		fs.writeFile(fileName, fileContent, 'utf8', function () {
-			setTimeout(devIndex, 0);
+			setTimeout(function () {
+				devIndex(publicPath);
+			}, 0);
 		});
 	},
 	getConfigForRoot: function (root) {
@@ -134,7 +129,6 @@ var indexHtml = {
 			for (let j = 0; j < config.data.length; j++) {
 				let files = config.data[j].inputFiles;
 				for (let k = 0; k < files.length; k++) {
-					//console.log("check", file, files[k]);
 					if (file === files[k]) return config;
 				}
 			}
@@ -143,8 +137,7 @@ var indexHtml = {
 	}
 };
 
-
-var devIndex = function () {
+var devIndex = function (publicPath) {
 	var error = false;
 	var allFiles1 = getFiles().slice(0);
 	var filesCnt = {};
@@ -152,7 +145,7 @@ var devIndex = function () {
 		let set = allFiles1[i];
 		let files = set.inputFiles;
 		for (let j = 0; j < files.length; j++) {
-			let file = gulpConfig.path.public + "/" + files[j];
+			let file = publicPath + "/" + files[j];
 			if (filesCnt[file]) {
 				console.error("File is already loaded", files[j], file);
 				error = true;
@@ -189,23 +182,92 @@ var devIndex = function () {
 			devWatchFinish = true;
 			logFile('Index File copied', path);
 		}))
-		.pipe(gulp.dest(gulpConfig.path.public));
+		.pipe(gulp.dest(publicPath));
 };
-gulp.task('Dev-Index', devIndex);
 
 var devWatchFinish = false;
 var showError = function (error) {
 	console.log(error);
 	this.emit('end');
 }
-gulp.task("Dev-Copy-Es6", ["Clean-wwwroot"],
+gulp.task("Es6-Clean", function () {
+	return del([gulpConfig.profiles.dev.es6.public + '/**', '!' + gulpConfig.profiles.dev.es6.public]).then(paths => {
+		console.log('Deleted dev-public files and folders');
+	});
+});
+
+gulp.task("Es5-Clean", function () {
+	return del([gulpConfig.profiles.dev.es5.public + '/**', '!' + gulpConfig.profiles.dev.es5.public]).then(paths => {
+		console.log('Deleted dev-public files and folders');
+	});
+});
+
+
+var restFilesWatcher = function (obj, publicPath) {
+	if (typeof obj.event !== "string" || obj.extname.indexOf("_tmp___") > -1) return;
+	if (['add', 'unlink'].indexOf(obj.event) > -1) indexHtml.updateConfigFiles(obj.relative, obj.event, publicPath);
+	gulp.src(obj.path, {base: gulpConfig.path.src})
+		.pipe(plumber())
+		.pipe(gulpif(function (file) {
+			return fileExists(file.path);
+		}, gulp.dest(publicPath + "/")));
+}
+var scssFilesWatcher = function (obj, publicPath) {
+	if (typeof obj.event !== "string" || obj.extname.indexOf("_tmp___") > -1) return;
+	if (['add', 'unlink'].indexOf(obj.event) > -1) indexHtml.updateConfigFiles(obj.relative.replace(".scss", ".css"), obj.event, publicPath);
+	gulp.src(obj.path, {base: gulpConfig.path.src})
+		.pipe(plumber())
+		.pipe(sourceMaps.init())
+		.pipe(sass().on('error', sass.logError))
+		.pipe(sourceMaps.write())
+		.pipe(gulp.dest(publicPath + "/"));
+}
+var es5FilesWatcher = function (obj, publicPath) {
+	if (typeof obj.event !== "string" || obj.extname.indexOf("_tmp___") > -1) return;
+	if (['add', 'unlink'].indexOf(obj.event) > -1) indexHtml.updateConfigFiles(obj.relative, obj.event, publicPath);
+	gulp.src(obj.path, {base: gulpConfig.path.src})
+		.pipe(plumber())
+		.pipe(gulpif(function (file) {
+			return fileExists(file.path);
+		}, gulp.dest(publicPath + "/")));
+}
+var es6FilesWatcher = function (obj, publicPath) {
+	if (typeof obj.event !== "string" || obj.extname.indexOf("_tmp___") > -1) return;
+	if (['add', 'unlink'].indexOf(obj.event) > -1) indexHtml.updateConfigFiles(obj.relative.replace(".es6.", ".").replace("." + dev.short + ".", ""), obj.event, publicPath);
+	gulp.src(obj.path, {base: gulpConfig.path.src})
+		.pipe(plumber())
+		.pipe(rename(function (file) {
+			let filePath = getFilePath(file, gulpConfig.path.src);
+			if (!fileExists(filePath)) return false;
+			if (file.basename.endsWith('.es6')) file.basename = file.basename.slice(0, -4);
+			if (file.basename.endsWith("." + dev.short)) file.basename = file.basename.replace("." + dev.short, "");
+		}))
+		.pipe(gulp.dest(publicPath + "/"));
+}
+var es6FilesTranspiler = function (obj, publicPath) {
+	if (typeof obj.event !== "string" || obj.extname.indexOf("_tmp___") > -1) return;
+	if (['add', 'unlink'].indexOf(obj.event) > -1) indexHtml.updateConfigFiles(obj.relative.replace(".es6.", ".").replace("." + dev.short + ".", ""), obj.event, publicPath);
+	gulp.src(obj.path, {base: gulpConfig.path.src})
+		.pipe(plumber())
+		.pipe(sourceMaps.init())
+		.pipe(babel({presets: gulpConfig.babelPresets, compact: false}))
+		.pipe(sourceMaps.write())
+		.pipe(rename(function (file) {
+			if (file.basename.endsWith('.es6')) file.basename = file.basename.slice(0, -4);
+			if (file.basename.endsWith("." + dev.short)) file.basename = file.basename.replace("." + dev.short, "");
+		}))
+		.pipe(gulp.dest(publicPath + "/"));
+}
+var watcherConfig = {base: gulpConfig.path.src, ignoreInitial: true, verbose: true, usePolling: true};
+
+gulp.task("Es6-Dev-Copy", ["Es6-Clean"],
 	function () {
 		var tasksEnded = 0;
 
 		function runEndTask() {
 			tasksEnded++;
 			if (tasksEnded !== 4) return;
-			devIndex();
+			devIndex(gulpConfig.profiles.dev.es6.public);
 		}
 
 		return gulp.src(files.development.restFiles, {base: gulpConfig.path.src})
@@ -214,7 +276,7 @@ gulp.task("Dev-Copy-Es6", ["Clean-wwwroot"],
 				if (fullPath === gulpConfig.favicon) file.dirname = "";
 				logFile("Rest file copied", file, gulpConfig.favicon);
 			}))
-			.pipe(gulp.dest(gulpConfig.path.public + "/"))
+			.pipe(gulp.dest(gulpConfig.profiles.dev.es6.public + "/"))
 			.on("end", function () {
 				console.log("Rest files copy ended");
 				runEndTask();
@@ -226,7 +288,7 @@ gulp.task("Dev-Copy-Es6", ["Clean-wwwroot"],
 				.pipe(sourceMaps.init())
 				.pipe(sass().on('error', sass.logError))
 				.pipe(sourceMaps.write())
-				.pipe(gulp.dest(gulpConfig.path.public + "/"))
+				.pipe(gulp.dest(gulpConfig.profiles.dev.es6.public + "/"))
 				.on("end", function () {
 					console.log("Scss files copy ended");
 					runEndTask();
@@ -235,7 +297,7 @@ gulp.task("Dev-Copy-Es6", ["Clean-wwwroot"],
 				.pipe(rename(function (file) {
 					logFile("Es5 file copied", file);
 				}))
-				.pipe(gulp.dest(gulpConfig.path.public + "/"))
+				.pipe(gulp.dest(gulpConfig.profiles.dev.es6.public + "/"))
 				.on("end", function () {
 					console.log("Es5 file copy ended");
 					runEndTask();
@@ -246,69 +308,38 @@ gulp.task("Dev-Copy-Es6", ["Clean-wwwroot"],
 					if (file.basename.endsWith("." + dev.short)) file.basename = file.basename.replace("." + dev.short, "");
 					logFile("Es6 file copied", file);
 				}))
-				.pipe(gulp.dest(gulpConfig.path.public + "/"))
+				.pipe(gulp.dest(gulpConfig.profiles.dev.es6.public + "/"))
 				.on("end", function () {
 					console.log("Es6 file copy ended");
 					runEndTask();
 				});
 	});
-
-gulp.task("Dev-Watch-Es6", [],
+var DEBUG = "*";
+gulp.task("Es6-Dev-Watch",
 	function () {
-		watch(files.development.restFiles, {base: gulpConfig.path.src, ignoreInitial: true, verbose: true, usePolling: true}, function (obj) {
-			if (typeof obj.event !== "string" || obj.extname.indexOf("_tmp___") > -1) {
-				// console.log("restfile NOT EXECUTED for", obj.path, obj.extname);
-				return;
-			}
-			// console.log("restfile", obj.path, obj.extname);
-			if (['add', 'unlink'].indexOf(obj.event) > -1) indexHtml.updateConfigFiles(obj.relative, obj.event);
-			gulp.src(obj.path, {base: gulpConfig.path.src})
-				.pipe(plumber())
-				.pipe(gulpif(function (file) {
-					return fileExists(file.path);
-				}, gulp.dest(gulpConfig.path.public + "/")));
+
+		watch(files.development.restFiles, watcherConfig, function (obj) {
+			restFilesWatcher(obj, gulpConfig.profiles.dev.es6.public);
 		});
-		watch(files.common.scssFiles, {base: gulpConfig.path.src, ignoreInitial: true, verbose: true, usePolling: true}, function (obj) {
-			if (typeof obj.event !== "string") return;
-			if (['add', 'unlink'].indexOf(obj.event) > -1) indexHtml.updateConfigFiles(obj.relative.replace(".scss", ".css"), obj.event);
-			gulp.src(obj.path, {base: gulpConfig.path.src})
-				.pipe(plumber())
-				.pipe(sourceMaps.init())
-				.pipe(sass().on('error', sass.logError))
-				.pipe(sourceMaps.write())
-				.pipe(gulp.dest(gulpConfig.path.public + "/"));
+		watch(files.common.scssFiles, watcherConfig, function (obj) {
+			scssFilesWatcher(obj, gulpConfig.profiles.dev.es6.public);
 		});
-		watch(files.common.es5Files, {base: gulpConfig.path.src, ignoreInitial: true, verbose: true, usePolling: true}, function (obj) {
-			gulp.src(obj.path, {base: gulpConfig.path.src})
-				.pipe(plumber())
-				.pipe(gulpif(function (file) {
-					return fileExists(file.path);
-				}, gulp.dest(gulpConfig.path.public + "/")));
+		watch(files.common.es5Files, watcherConfig, function (obj) {
+			es5FilesWatcher(obj, gulpConfig.profiles.dev.es6.public);
 		});
-		watch(files.development.es6Files, {base: gulpConfig.path.src, ignoreInitial: true, verbose: true, usePolling: true}, function (obj) {
-			if (typeof obj.event !== "string") return;
-			// console.log("es6file", obj.path, obj.extname);
-			if (['add', 'unlink'].indexOf(obj.event) > -1) indexHtml.updateConfigFiles(obj.relative.replace(".es6.", "."), obj.event);
-			gulp.src(obj.path, {base: gulpConfig.path.src})
-				.pipe(plumber())
-				.pipe(rename(function (file) {
-					let filePath = getFilePath(file, gulpConfig.path.src);
-					if (!fileExists(filePath)) return false;
-					if (file.basename.endsWith('.es6')) file.basename = file.basename.slice(0, -4);
-					if (file.basename.endsWith("." + dev.short)) file.basename = file.basename.replace("." + dev.short, "");
-				}))
-				.pipe(gulp.dest(gulpConfig.path.public + "/"));
+		watch(files.development.es6Files, watcherConfig, function (obj) {
+			es6FilesWatcher(obj, gulpConfig.profiles.dev.es6.public);
 		});
-		watch(files.jsHint.files, {base: gulpConfig.path.src, ignoreInitial: true, verbose: false, usePolling: true}, function (obj) {
+		watch(files.jsHint.files, watcherConfig, function (obj) {
 			gulp.src(obj.path, {base: gulpConfig.path.src})
 				.pipe(plumber())
 				.pipe(jshint(files.jsHint.config))
 				.pipe(jshint.reporter(stylish));
 		});
-		if (gulpConfig.deployFtp && gulpConfig.deployFtp.devWatch) {
-			let profile = gulpConfig.deployFtp.profiles[gulpConfig.deployFtp.devWatch];
-			watch(files.wwwroot, {base: gulpConfig.path.public, ignoreInitial: true, verbose: false, usePolling: true}, function (obj) {
-				gulp.src(obj.path, {base: gulpConfig.path.public})
+		if (gulpConfig.deployFtp && gulpConfig.deployFtp.profiles && gulpConfig.deployFtp.profiles.devEs6 && gulpConfig.deployFtp.profiles.devEs6.watcher) {
+			let profile = gulpConfig.deployFtp.profiles.devEs6;
+			watch(profile.src +"/**/*.*", {base: gulpConfig.profiles.dev.es6.public, ignoreInitial: true, verbose: false, usePolling: true}, function (obj) {
+				gulp.src(obj.path, {base: gulpConfig.profiles.dev.es6.public})
 					.pipe(plumber())
 					.pipe(sftp({
 						host: profile.host,
@@ -322,15 +353,14 @@ gulp.task("Dev-Watch-Es6", [],
 		}
 	});
 
-gulp.task("Dev-Copy-Es5", ["Clean-wwwroot"],
+gulp.task("Es5-Dev-Copy", ["Es5-Clean"],
 	function () {
 		var tasksEnded = 0;
 
 		function runEndTask() {
 			tasksEnded++;
 			if (tasksEnded !== 4) return;
-			// runSequence('Dev-Watch-Es5');
-			devIndex();
+			devIndex(gulpConfig.profiles.dev.es5.public);
 		}
 
 		return gulp.src(files.development.restFiles, {base: gulpConfig.path.src})
@@ -339,7 +369,7 @@ gulp.task("Dev-Copy-Es5", ["Clean-wwwroot"],
 				if (fullPath === gulpConfig.favicon) file.dirname = "";
 				logFile("Rest file copied", file);
 			}))
-			.pipe(gulp.dest(gulpConfig.path.public + "/"))
+			.pipe(gulp.dest(gulpConfig.profiles.dev.es5.public + "/"))
 			.on("end", function () {
 				console.log("Rest files copy ended");
 				runEndTask();
@@ -351,7 +381,7 @@ gulp.task("Dev-Copy-Es5", ["Clean-wwwroot"],
 				.pipe(sourceMaps.init())
 				.pipe(sass().on('error', sass.logError))
 				.pipe(sourceMaps.write())
-				.pipe(gulp.dest(gulpConfig.path.public + "/"))
+				.pipe(gulp.dest(gulpConfig.profiles.dev.es5.public + "/"))
 				.on("end", function () {
 					console.log("Scss files copy ended");
 					runEndTask();
@@ -360,7 +390,7 @@ gulp.task("Dev-Copy-Es5", ["Clean-wwwroot"],
 				.pipe(rename(function (path) {
 					logFile("Es5 file copied", path);
 				}))
-				.pipe(gulp.dest(gulpConfig.path.public + "/"))
+				.pipe(gulp.dest(gulpConfig.profiles.dev.es5.public + "/"))
 				.on("end", function () {
 					console.log("Es5 files copy ended");
 					runEndTask();
@@ -374,63 +404,38 @@ gulp.task("Dev-Copy-Es5", ["Clean-wwwroot"],
 					if (path.basename.endsWith('.es6')) path.basename = path.basename.slice(0, -4);
 					if (path.basename.endsWith("." + dev.short)) path.basename = path.basename.replace("." + dev.short, "");
 				}))
-				.pipe(gulp.dest(gulpConfig.path.public + "/"))
+				.pipe(gulp.dest(gulpConfig.profiles.dev.es5.public + "/"))
 				.on("end", function () {
 					console.log("Es6 files copy ended");
 					runEndTask();
 				});
 	});
-gulp.task("Dev-Watch-Es5", [],
+
+gulp.task("Es5-Dev-Watch",
 	function () {
-		watch(files.development.restFiles, {base: gulpConfig.path.src, ignoreInitial: true, verbose: true}, function (obj) {
-			gulp.src(obj.path, {base: gulpConfig.path.src})
-				.pipe(plumber())
-				.pipe(rename(function (file) {
-					indexHtml.updateConfigFiles(pathFn.join(file.dirname, file.basename + file.extname), "restDevFiles");
-				}))
-				.pipe(gulp.dest(gulpConfig.path.public + "/"));
+		watch(files.development.restFiles, watcherConfig, function (obj) {
+			restFilesWatcher(obj, gulpConfig.profiles.dev.es5.public);
 		});
-		watch(files.common.scssFiles, {base: gulpConfig.path.src, ignoreInitial: true, verbose: true}, function (obj) {
-			gulp.src(obj.path, {base: gulpConfig.path.src})
-				.pipe(plumber())
-				.pipe(rename(function (file) {
-					indexHtml.updateConfigFiles(pathFn.join(file.dirname, file.basename + file.extname), "scssFiles");
-				}))
-				.pipe(sourceMaps.init())
-				.pipe(sass().on('error', sass.logError))
-				.pipe(sourceMaps.write())
-				.pipe(gulp.dest(gulpConfig.path.public + "/"));
+		watch(files.common.scssFiles, watcherConfig, function (obj) {
+			scssFilesWatcher(obj, gulpConfig.profiles.dev.es5.public);
 		});
-		watch(files.common.es5Files, {base: gulpConfig.path.src, ignoreInitial: true, verbose: true}, function (obj) {
-			gulp.src(obj.path, {base: gulpConfig.path.src})
-				.pipe(plumber())
-				.pipe(rename(function (file) {
-					indexHtml.updateConfigFiles(pathFn.join(file.dirname, file.basename + file.extname), "es5Files");
-				}))
-				.pipe(gulp.dest(gulpConfig.path.public + "/"));
+		watch(files.common.es5Files, watcherConfig, function (obj) {
+			es5FilesWatcher(obj, gulpConfig.profiles.dev.es5.public);
 		});
-		watch(files.development.es6Files, {base: gulpConfig.path.src, ignoreInitial: true, verbose: true}, function (obj) {
-			gulp.src(obj.path, {base: gulpConfig.path.src})
-				.pipe(plumber())
-				.pipe(sourceMaps.init())
-				.pipe(babel({presets: gulpConfig.babelPresets, compact: false}))
-				.pipe(sourceMaps.write())
-				.pipe(rename(function (file) {
-					indexHtml.updateConfigFiles(pathFn.join(file.dirname, file.basename + file.extname), "es6DevFiles");
-					if (file.basename.endsWith('.es6')) file.basename = file.basename.slice(0, -4);
-					if (file.basename.endsWith("." + dev.short)) file.basename = file.basename.replace("." + dev.short, "");
-				}))
-				.pipe(gulp.dest(gulpConfig.path.public + "/"));
-		});
-		//runSequence('dev-watch-jshint');
-		watch(files.jsHint.files, {base: gulpConfig.path.src, ignoreInitial: false, verbose: true}, function (obj) {
-			gulp.src(obj.path, {base: gulpConfig.path.src})
-				.pipe(plumber())
-				.pipe(jshint(files.jsHint.config))
-				.pipe(jshint.reporter(stylish));
+		watch(files.development.es6Files, watcherConfig, function (obj) {
+			es6FilesTranspiler(obj, gulpConfig.profiles.dev.es5.public);
 		});
 	});
 
+gulp.task('Dev-Index', devIndex);
+
+gulp.task("JsHintReport", function () {
+	return gulp.src(files.jsHint.files, {base: gulpConfig.path.src})
+		.pipe(plumber())
+		.pipe(jshint(files.jsHint.config))
+		.pipe(jshint.reporter(stylish));
+
+});
 
 function getFilePath(file, src) {
 	let filePath = src.replace("/", "") + "\\" + file.dirname + "\\" + file.basename + file.extname;
