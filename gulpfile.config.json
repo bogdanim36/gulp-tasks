@@ -5,11 +5,27 @@
       "components/bower-libs",
       "app-modules/bower-libs"
     ],
-    "public": "wwwroot",
-    "publishPrepare": "src-compiled"
     "applicationInfo": "application-info"
   },
-  "productionBase": "/",
+    "profiles": {
+    "dev": {
+      "es6": {
+        "prepare": "compiled/es6",
+        "public": "public/es6"
+      },
+      "es5": {
+        "prepare": "compiled/es5",
+        "public": "public/es5"
+      }
+    },
+    "prod": {
+      "angularBase": "/",
+      "prepare": "compiled/prod",
+      "public": "public/prod",
+      "remote": {
+      }
+    }
+  },
   "tasks": [
     {
       "extension": ".css",
@@ -32,9 +48,9 @@
       "unix",
       "windows"
     ],
-    "devWatch1": "devWatchEs6",
     "profiles": {
-      "devWatchEs6": {
+      "devEs6": {
+        "watcher": true,
         "type": "sftp",
         "host": "my-server",
         "port": "22",
