@@ -19,11 +19,6 @@ for (let config in configFiles) {
 	configFiles[config].data = require("../" + gulpConfig.path.src + path)
 }
 
-gulp.task("Clean-wwwroot", function () {
-	return del([gulpConfig.path.public + '/**', '!' + gulpConfig.path.public]).then(paths => {
-		console.log('Deleted ' + gulpConfig.path.public + ' files and folders:');
-	});
-});
 
 global.addBowerLibsFolders = function (destination, prefix, sufix, root) {
 	root = root || gulpConfig.path.src;
@@ -41,7 +36,6 @@ global.isBowerLibs = function (path) {
 };
 
 global.files = {
-	wwwroot: [gulpConfig.path.public + "/**/*"],
 	jsHint: {
 		config: {esversion: 6},
 		files: [
@@ -82,25 +76,26 @@ global.files = {
 				"!" + gulpConfig.path.src + "{excepted,excepted/**}"]
 		},
 		prepare: {
-			html: [gulpConfig.path.publishPrepare + "/**/*.html",
-				gulpConfig.path.publishPrepare + "/**/*.config",
-				gulpConfig.path.publishPrepare + "/**/ax-theme.*.*",
-				gulpConfig.path.publishPrepare + "/**/*.png"],
-			api: [gulpConfig.path.publishPrepare + "/**/*.php", gulpConfig.path.publishPrepare + "/**/*.json"],
-			licenses: [gulpConfig.path.publishPrepare + "/**/*.md"],
+			html: [gulpConfig.profiles.prod.prepare + "/**/*.html",
+				gulpConfig.profiles.prod.prepare + "/**/*.config",
+				gulpConfig.profiles.prod.prepare + "/**/ax-theme.*.*",
+				gulpConfig.profiles.prod.prepare + "/**/*.png"],
+			api: [gulpConfig.profiles.prod.prepare + "/**/*.php", gulpConfig.profiles.prod.prepare + "/**/*.json"],
+			licenses: [gulpConfig.profiles.prod.prepare + "/**/*.md"],
 			fontFiles: function () {
 				var fontsFileMasks = [];
 				for (let i = 0; i < gulpConfig.fontsFileMasks.length; i++) {
-					fontsFileMasks.push(gulpConfig.path.publishPrepare + gulpConfig.fontsFileMasks[i]);
+					fontsFileMasks.push(gulpConfig.profiles.prod.prepare + gulpConfig.fontsFileMasks[i]);
 				}
 				return fontsFileMasks;
 			},
 			exceptedFolders: function (exceptions) {
 				var foldersExcepted = [];
 				for (let j = 0; j < exceptions.length; j++) {
-					foldersExcepted.push(gulpConfig.path.publishPrepare + "/" + exceptions + "**/*");
+					foldersExcepted.push(gulpConfig.profiles.prod.prepare + "/" + exceptions + "**/*");
 				}
-				return [foldersExcepted.join(",")];
+				if (foldersExcepted.length===0) return [];
+				else return [foldersExcepted.join(",")];
 			}
 		}
 	}
@@ -122,19 +117,11 @@ global.logFile = function (mesaj, path) {
 	if (path.extname === "") return;
 	console.log(mesaj + ":", typeof path === 'string' ? path : (path.dirname + '\\' + path.basename + path.extname));
 };
-
-gulp.task("JsHintReport", function () {
-	return gulp.src(files.jsHint.files, {base: gulpConfig.path.src})
-		.pipe(plumber())
-		.pipe(jshint(files.jsHint.config))
-		.pipe(jshint.reporter(stylish));
-
-});
 if (gulpConfig.deployFtp && gulpConfig.deployFtp.profiles) {
 	for (let profile in gulpConfig.deployFtp.profiles) {
 		let profileCfg = gulpConfig.deployFtp.profiles[profile];
 		gulp.task("Ftp-deploy-" + profile, function () {
-			return gulp.src('wwwroot/**/*.*')
+			return gulp.src(profileCfg.src + '/**/*.*')
 				.pipe(sftp({
 					host: profileCfg.host,
 					port: profileCfg.port,
