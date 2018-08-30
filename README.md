@@ -14,3 +14,5 @@ For deploy, is enough to run Publish All task, which will do operations: compile
 
 One problem, which must solve manually, is the order to include files in index.html head. By default, new files are added to end of the list
 , but also is possible your IDE editor to delete and recreate the file you are editing, situation which produce a remove and add (to end of the list) of this file.
+
+This repo si just for presentation, if you want to use, take a look at https://github.com/bogdanim36/project
